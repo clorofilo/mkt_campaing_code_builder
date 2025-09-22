@@ -32,9 +32,9 @@ CUSTOM_CSS = """
 .block-container {padding-top: 2rem;}
 
 /*********** Tarjeta principal ***********/
-.card { 
-  border-radius: 18px; 
-  padding: 1.25rem 1.25rem; 
+.card {
+  border-radius: 18px;
+  padding: 1.25rem 1.25rem;
   border: 1px solid rgba(0,0,0,0.06);
   background: linear-gradient(180deg, rgba(255,255,255,0.9), rgba(249,250,251,0.9));
   box-shadow: 0 6px 24px rgba(0,0,0,0.06);
@@ -51,7 +51,7 @@ CUSTOM_CSS = """
 
 /*********** Resultado grande ***********/
 .result {
-  font-weight: 700; font-size: clamp(18px, 2.6vw, 36px); letter-spacing: .5px; 
+  font-weight: 700; font-size: clamp(18px, 2.6vw, 36px); letter-spacing: .5px;
   padding: .75rem 1rem; border-radius: 14px; background: #0F766E; color: white;
   display:inline-block;
 }
@@ -165,17 +165,41 @@ def seleccionar_programa_meta():
     return area, tipo, zona, area_zona, modalidad
 
 
-def seleccionar_programa_google():
+def seleccionar_programa_google(pmax_seleccion="No"):
+    """Filtra y selecciona la modalidad para Google, considerando PMax."""
     d = df_modalidades[df_modalidades["Plataforma"] == "Google"].copy()
 
+    # Filtrar por PMax ANTES de obtener las demás opciones
+    if "Pmax" in d.columns:
+        pmax_filter_col = d["Pmax"].astype(str).fillna("No")
+        if pmax_seleccion == "Sí":
+            d = d[pmax_filter_col == "pmax"]
+        else:
+            d = d[pmax_filter_col == "No"]
+
+    if d.empty:
+        st.warning(f"No hay opciones disponibles para PMax: '{pmax_seleccion}'")
+        return None, None, None
+
     area_programa_list = sorted(pd.Series(d["Area/programa"]).dropna().astype(str).unique().tolist())
+    if not area_programa_list:
+        st.warning("No hay 'Área/Programa' para la selección de PMax.")
+        return None, None, None
     area = st.selectbox("Área/Programa (Google)", options=area_programa_list, index=0, key="g_area")
 
     dd = d[d["Area/programa"] == area]
     particularidad_list = sorted(pd.Series(dd["particularidad"]).dropna().astype(str).unique().tolist())
+    if not particularidad_list:
+        st.warning("No hay opciones de 'Demand gen' para el área seleccionada.")
+        return area, None, None
     part = st.selectbox("Demand gen o no", options=particularidad_list, index=0, key="g_part")
 
-    modalidad = dd[dd["particularidad"] == part]["Modalidad"].iloc[0]
+    final_selection = dd[dd["particularidad"] == part]
+    if final_selection.empty:
+        st.error("No se encontró una modalidad para la combinación seleccionada.")
+        return area, part, None
+
+    modalidad = final_selection["Modalidad"].iloc[0]
     return area, part, modalidad
 
 
@@ -217,6 +241,7 @@ with left:
 
     # Particularidad (según plataforma)
     particularidades = seleccionar_particularidad(plataforma, region, pais_area)
+    pmax_option = "No" # Default
 
     if plataforma == "LinkedIn":
         # 'particularidades' son valores de Columna1
@@ -301,7 +326,14 @@ elif plataforma == "Google":
     # selección adicional para Google
     st.divider()
     st.subheader("Google – Detalles de campaña")
-    g_area, g_particularidad2, modalidad = seleccionar_programa_google()
+
+    # PMax option
+    if "Pmax" in df_modalidades.columns:
+        pmax_option = st.selectbox("Campaña PMax?", options=["No", "Sí"], index=0, key="pmax_option")
+    else:
+        pmax_option = "No"
+
+    g_area, g_particularidad2, modalidad = seleccionar_programa_google(pmax_option)
 
     # promo basada en df_promo con filtros (como tu script)
     try:
@@ -313,8 +345,9 @@ elif plataforma == "Google":
         ]["Promocion"].iloc[0]
     except IndexError:
         promo = None
-    
+
     extra_info = {
+        "PMax": pmax_option,
         "Programa/Área (Google)": g_area,
         "Demand gen o no": g_particularidad2,
     }
@@ -385,6 +418,9 @@ for col in ["Plataforma", "Pais/Area", "Area/programa"]:
 for col in ["Plataforma", "Area/programa", "Modalidad"]:
     if col not in df_modalidades.columns:
         missing.append(f"modalidad.{col}")
+if "Pmax" not in df_modalidades.columns:
+    st.warning("Columna 'Pmax' no encontrada en la hoja 'modalidad'. Se ignorará el filtro PMax.")
+
 if missing:
     st.warning("Columnas faltantes: " + ", ".join(missing))
 
