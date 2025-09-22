@@ -173,7 +173,7 @@ def seleccionar_programa_google(pmax_seleccion="No"):
     if "Pmax" in d.columns:
         pmax_filter_col = d["Pmax"].astype(str).fillna("No")
         if pmax_seleccion == "Sí":
-            d = d[pmax_filter_col == "Sí"]
+            d = d[pmax_filter_col == "pmax"]
         else:
             d = d[pmax_filter_col == "No"]
 
