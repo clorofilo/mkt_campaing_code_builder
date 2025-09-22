@@ -424,4 +424,3 @@ if "Pmax" not in df_modalidades.columns:
 if missing:
     st.warning("Columnas faltantes: " + ", ".join(missing))
 
-st.caption("Hecho con ❤️ para agilizar tu flujo de campañas.")
